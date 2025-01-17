@@ -86,6 +86,17 @@ def create_dash_app(flask_app):
         )
         return fig
 
+    def create_martelo_chart():
+        fig = go.Figure(data=[
+            go.Bar(x=data['PETR4'].index, y=data['PETR4']['volume'], name='Martelo')
+        ])
+        fig.update_layout(
+            xaxis_title="Date",
+            yaxis_title="Volume",
+            title="Gráfico de Martelo"
+        )
+        return fig
+
     # Layout do Dash
     dash_app.layout = html.Div([
         html.Div([
@@ -122,6 +133,7 @@ def create_dash_app(flask_app):
         ], style={'margin-top': '30px'}),
 
         html.Div([
+            html.Button("Mostrar Gráfico de Martelo", id="martelo-btn", n_clicks=0),
             html.Button("Mostrar Gráfico de Barras", id="show-bar-chart", n_clicks=0),
             html.Button("Mostrar Gráfico de Linhas", id="show-line-chart", n_clicks=0)
         ], style={'text-align': 'center', 'margin-top': '20px'}),
@@ -140,15 +152,28 @@ def create_dash_app(flask_app):
     def update_candlestick_chart(start_date, end_date):
         return create_candlestick_chart(start_date, end_date)
 
-    # Callback para alternar entre os gráficos de barras e linhas
+    # Callback para alternar entre os gráficos de candlestick, martelo, barras e linhas
     @dash_app.callback(
         Output('additional-graph', 'figure'),
         [Input('show-bar-chart', 'n_clicks'),
-         Input('show-line-chart', 'n_clicks')]
+         Input('show-line-chart', 'n_clicks'),
+         Input('martelo-btn', 'n_clicks')]
     )
-    def update_additional_graph(bar_clicks, line_clicks):
-        if bar_clicks > line_clicks:
+    def update_additional_graph(bar_clicks, line_clicks, martelo_clicks):
+        # Verificar qual botão foi clicado
+        ctx = dash.callback_context
+        if not ctx.triggered:
+            return create_line_chart()  # Valor inicial padrão
+
+        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+        # Retornar o gráfico correspondente
+        if button_id == 'show-bar-chart':
             return create_bar_chart()
+        elif button_id == 'martelo-btn':
+            return create_martelo_chart()
+        elif button_id == 'show-line-chart':
+            return create_line_chart()
         else:
             return create_line_chart()
 
