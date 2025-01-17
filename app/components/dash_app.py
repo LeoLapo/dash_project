@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 import pandas as pd
 import numpy as np
 
+
 def create_dash_app(flask_app):
     dash_app = dash.Dash(
         __name__,
@@ -36,36 +37,53 @@ def create_dash_app(flask_app):
         return data
 
     # Carregar dados simulados
-    data = generate_simulated_data()['PETR4']
+    data = generate_simulated_data()
 
     # Funções para criar gráficos
-    def create_candlestick_chart(filtered_data):
-        fig = go.Figure(data=[go.Candlestick(
-            x=filtered_data.index,
-            open=filtered_data['open'],
-            high=filtered_data['high'],
-            low=filtered_data['low'],
-            close=filtered_data['close'],
-            name='Candlestick Chart'
-        )])
+    def create_candlestick_chart(start_date=None, end_date=None):
+        filtered_data = data['PETR4']
+        if start_date and end_date:
+            filtered_data = filtered_data.loc[start_date:end_date]
+
+        fig = go.Figure()
+        fig.add_trace(
+            go.Candlestick(
+                x=filtered_data.index,
+                open=filtered_data['open'],
+                high=filtered_data['high'],
+                low=filtered_data['low'],
+                close=filtered_data['close'],
+                name='Candlestick Chart'
+            )
+        )
+        fig.update_layout(
+            xaxis_title="Date",
+            yaxis_title="Price",
+            title="Candlestick Chart with Date Range",
+            hovermode="x unified"
+        )
         return fig
 
-    def create_engolfo_alta_chart(filtered_data):
-        fig = go.Figure(data=[
-            go.Scatter(x=filtered_data.index, y=filtered_data['close'], mode='lines+markers', name='Engolfo Alta')
-        ])
+    def create_bar_chart():
+        fig = go.Figure(
+            data=[go.Bar(x=data['PETR4'].index, y=data['PETR4']['volume'], name="Volume")]
+        )
+        fig.update_layout(
+            xaxis_title="Date",
+            yaxis_title="Volume",
+            title="Bar Chart (Volume)"
+        )
         return fig
 
-    def create_doji_chart(filtered_data):
-        fig = go.Figure(data=[
-            go.Scatter(x=filtered_data.index, y=(filtered_data['open'] + filtered_data['close']) / 2, mode='lines+markers', name='Doji')
-        ])
-        return fig
-
-    def create_martelo_chart(filtered_data):
-        fig = go.Figure(data=[
-            go.Bar(x=filtered_data.index, y=filtered_data['volume'], name='Martelo')
-        ])
+    def create_line_chart():
+        fig = go.Figure(
+            data=[go.Scatter(x=data['PETR4'].index, y=data['PETR4']['close'], mode='lines', name="Close Price")]
+        )
+        fig.update_layout(
+            xaxis_title="Date",
+            yaxis_title="Close Price",
+            title="Line Chart (Close Price)"
+        )
         return fig
 
     # Layout do Dash
@@ -92,51 +110,46 @@ def create_dash_app(flask_app):
             html.Label("Selecione o intervalo de datas:"),
             dcc.DatePickerRange(
                 id='date-picker-range',
-                start_date=data.index.min(),
-                end_date=data.index.max(),
+                start_date=data['PETR4'].index.min(),
+                end_date=data['PETR4'].index.max(),
                 display_format='YYYY-MM-DD',
                 style={'margin': '10px'}
             )
         ], style={'text-align': 'center', 'margin-top': '20px'}),
 
         html.Div([
-            dcc.Graph(id='main-graph'),
+            dcc.Graph(id='candlestick-graph'),
         ], style={'margin-top': '30px'}),
 
         html.Div([
-            html.Button("Mostrar Candlestick", id="show-candlestick-chart", n_clicks=0),
-            html.Button("Mostrar Engolfo de Alta", id="show-engolfo-alta-chart", n_clicks=0),
-            html.Button("Mostrar Doji", id="show-doji-chart", n_clicks=0),
-            html.Button("Mostrar Martelo", id="show-martelo-chart", n_clicks=0)
+            html.Button("Mostrar Gráfico de Barras", id="show-bar-chart", n_clicks=0),
+            html.Button("Mostrar Gráfico de Linhas", id="show-line-chart", n_clicks=0)
         ], style={'text-align': 'center', 'margin-top': '20px'}),
+
+        html.Div([
+            dcc.Graph(id='additional-graph'),
+        ], style={'margin-top': '30px'}),
     ])
 
-    # Callback para atualizar o gráfico principal com base no intervalo de datas e no gráfico escolhido
+    # Callback para atualizar o gráfico de candlestick com base no intervalo de datas selecionado
     @dash_app.callback(
-        Output('main-graph', 'figure'),
+        Output('candlestick-graph', 'figure'),
         [Input('date-picker-range', 'start_date'),
-         Input('date-picker-range', 'end_date'),
-         Input('show-candlestick-chart', 'n_clicks'),
-         Input('show-engolfo-alta-chart', 'n_clicks'),
-         Input('show-doji-chart', 'n_clicks'),
-         Input('show-martelo-chart', 'n_clicks')]
+         Input('date-picker-range', 'end_date')]
     )
-    def update_graph(start_date, end_date, candlestick_clicks, engolfo_clicks, doji_clicks, martelo_clicks):
-        # Filtrar os dados conforme o intervalo de datas
-        filtered_data = data
-        if start_date and end_date:
-            filtered_data = data.loc[start_date:end_date]
+    def update_candlestick_chart(start_date, end_date):
+        return create_candlestick_chart(start_date, end_date)
 
-        # Verificar qual gráfico foi solicitado
-        if candlestick_clicks > engolfo_clicks and candlestick_clicks > doji_clicks and candlestick_clicks > martelo_clicks:
-            return create_candlestick_chart(filtered_data)
-        elif engolfo_clicks > candlestick_clicks and engolfo_clicks > doji_clicks and engolfo_clicks > martelo_clicks:
-            return create_engolfo_alta_chart(filtered_data)
-        elif doji_clicks > candlestick_clicks and doji_clicks > engolfo_clicks and doji_clicks > martelo_clicks:
-            return create_doji_chart(filtered_data)
-        elif martelo_clicks > candlestick_clicks and martelo_clicks > engolfo_clicks and martelo_clicks > doji_clicks:
-            return create_martelo_chart(filtered_data)
+    # Callback para alternar entre os gráficos de barras e linhas
+    @dash_app.callback(
+        Output('additional-graph', 'figure'),
+        [Input('show-bar-chart', 'n_clicks'),
+         Input('show-line-chart', 'n_clicks')]
+    )
+    def update_additional_graph(bar_clicks, line_clicks):
+        if bar_clicks > line_clicks:
+            return create_bar_chart()
         else:
-            return create_candlestick_chart(filtered_data)  # Default para Candlestick
+            return create_line_chart()
 
     return dash_app
